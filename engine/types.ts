@@ -1,5 +1,12 @@
 export type Facing = 1 | -1;
 
+export interface Hitbox {
+  offsetX: number;
+  offsetY: number;
+  width: number;
+  height: number;
+}
+
 export interface Player {
   x: number;
   y: number;
@@ -11,6 +18,9 @@ export interface Player {
   state: 'IDLE' | 'RUN' | 'ATTACK' | 'JUMP';
   facing: Facing;
   attackTimer: number;
+  attackPower?: number;
+  // optional default attack hitbox relative to player
+  attackBox?: Hitbox;
 }
 
 export interface EngineEnemy {
@@ -22,6 +32,7 @@ export interface EngineEnemy {
   type: 'Husk' | 'Angel' | 'Apostle';
   vx: number;
   hurtTimer: number;
+  stun?: number;
 }
 
 export interface Particle {

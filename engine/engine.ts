@@ -5,6 +5,10 @@ const GRAVITY = 0.8;
 const GROUND_Y = 380;
 const CANVAS_WIDTH = 800;
 
+// Impact tuning
+const HITSTOP_FRAMES = 8;
+const KNOCKBACK = 3;
+
 export type StatsCallback = (s: Stats) => void;
 export type GameOverCallback = () => void;
 
@@ -18,6 +22,11 @@ export class Engine {
   onGameOver?: GameOverCallback;
   width: number;
   height: number;
+
+  // Impact/feedback state
+  hitStopTimer = 0;
+  flashTimer = 0;
+  shake = 0;
 
   constructor(width = CANVAS_WIDTH, height = 450, onStats?: StatsCallback, onGameOver?: GameOverCallback) {
     this.width = width;
@@ -71,6 +80,17 @@ export class Engine {
 
   step(keys: Record<string, boolean>) {
     if (this.gameOver) return;
+
+    // If hitstop is active, only advance particles and timer for dramatic impact
+    if (this.hitStopTimer > 0) {
+      updateParticles(this.particles);
+      this.hitStopTimer--;
+      if (this.flashTimer > 0) this.flashTimer--;
+      // decay shake
+      this.shake *= 0.7;
+      return;
+    }
+
     const p = this.player;
 
     // Input
@@ -132,6 +152,13 @@ export class Engine {
         if (e.x < attackBox.x + attackBox.width && e.x + e.width > attackBox.x && e.y < attackBox.y + attackBox.height && e.y + e.height > attackBox.y) {
           e.hp -= 25;
           e.hurtTimer = 10;
+          // Knockback impulse
+          e.vx = (p.facing === 1 ? KNOCKBACK : -KNOCKBACK);
+          // Impact feedback
+          this.hitStopTimer = HITSTOP_FRAMES;
+          this.flashTimer = HITSTOP_FRAMES;
+          this.shake = 8;
+
           this.particles.push(...spawnHitParticles(e.x + e.width / 2, e.y + e.height / 2));
           this.stats.rage = Math.min(100, this.stats.rage + 5);
           this.notifyStats();
@@ -168,6 +195,14 @@ export class Engine {
   draw(ctx: CanvasRenderingContext2D, dpr = 1) {
     // Clear
     ctx.clearRect(0, 0, this.width, this.height);
+
+    // Apply small camera shake transform
+    ctx.save();
+    if (this.shake > 0) {
+      const sx = (Math.random() * 2 - 1) * this.shake;
+      const sy = (Math.random() * 2 - 1) * this.shake;
+      ctx.translate(sx, sy);
+    }
 
     // Background (parallax simple)
     ctx.fillStyle = '#111';
@@ -230,6 +265,14 @@ export class Engine {
       ctx.fillStyle = pt.color;
       ctx.fillRect(pt.x, pt.y, pt.size, pt.size);
     }
+    ctx.restore();
+
+    // Flash overlay for hits
+    if (this.flashTimer > 0) {
+      ctx.fillStyle = 'rgba(255,80,80,0.12)';
+      ctx.fillRect(0, 0, this.width, this.height);
+    }
+
     ctx.restore();
   }
 }
