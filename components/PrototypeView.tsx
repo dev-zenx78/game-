@@ -21,7 +21,7 @@ const PrototypeView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   }, []);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
+      const canvas = canvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
@@ -43,7 +43,16 @@ const PrototypeView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       engineRef.current = new Engine(CANVAS_WIDTH, CANVAS_HEIGHT, s => setStats(s), () => setGameOver(true));
     }
 
-    const handleKeyDown = (e: KeyboardEvent) => (keysRef.current[e.code] = true);
+    const urlParams = new URLSearchParams(window.location.search);
+    const debug = urlParams.get('debug') === '1';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      keysRef.current[e.code] = true;
+      // spawn enemy quickly in debug mode
+      if (debug && e.code === 'KeyP') {
+        if (engineRef.current) engineRef.current.spawnEnemy();
+      }
+    };
     const handleKeyUp = (e: KeyboardEvent) => (keysRef.current[e.code] = false);
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -52,7 +61,7 @@ const PrototypeView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     const loop = () => {
       engineRef.current!.step(keysRef.current);
-      engineRef.current!.draw(ctx, dpr);
+      engineRef.current!.draw(ctx, dpr, debug);
 
       animationFrameId = requestAnimationFrame(loop);
     };
@@ -132,6 +141,16 @@ const PrototypeView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 PROTOTYPE v0.1: COMBAT_DYNAMICS
             </div>
         </div>
+
+        {/* Debug Overlay (use ?debug=1) */}
+        {new URLSearchParams(window.location.search).get('debug') === '1' && (
+          <div className="absolute top-4 right-4 z-40 pointer-events-auto bg-black/70 border border-white/10 p-2 text-[11px] font-mono">
+            <div className="text-red-400 font-bold">DEBUG</div>
+            <div className="mt-1">P: Spawn Enemy</div>
+            <div className="mt-1">Hitstop: {engineRef.current?.hitStopTimer ?? 0}</div>
+            <div className="mt-1">Particles: {engineRef.current?.particles.length ?? 0}</div>
+          </div>
+        )}
       </div>
 
       <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-4xl text-xs font-mono opacity-50">

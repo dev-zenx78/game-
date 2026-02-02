@@ -192,7 +192,7 @@ export class Engine {
     updateParticles(this.particles);
   }
 
-  draw(ctx: CanvasRenderingContext2D, dpr = 1) {
+  draw(ctx: CanvasRenderingContext2D, dpr = 1, debug = false) {
     // Clear
     ctx.clearRect(0, 0, this.width, this.height);
 
@@ -266,6 +266,30 @@ export class Engine {
       ctx.fillRect(pt.x, pt.y, pt.size, pt.size);
     }
     ctx.restore();
+
+    // Debug hitboxes
+    if (debug) {
+      ctx.save();
+      ctx.strokeStyle = 'lime';
+      ctx.lineWidth = 1;
+      // Enemy hurtboxes
+      for (const e of this.enemies) {
+        ctx.strokeRect(e.x, e.y - 10, e.width, e.height);
+      }
+      // Player attack box preview when attacking
+      const p = this.player;
+      if (p.state === 'ATTACK') {
+        const attackBox = {
+          x: p.facing === 1 ? p.x + p.width : p.x - 80,
+          y: p.y - 20,
+          width: 80,
+          height: p.height + 40,
+        };
+        ctx.strokeStyle = 'red';
+        ctx.strokeRect(attackBox.x, attackBox.y, attackBox.width, attackBox.height);
+      }
+      ctx.restore();
+    }
 
     // Flash overlay for hits
     if (this.flashTimer > 0) {
