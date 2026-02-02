@@ -13,6 +13,7 @@ const PrototypeView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [stats, setStats] = useState({ hp: 100, rage: 0, kills: 0 });
   const [gameOver, setGameOver] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const keysRef = useRef<{ [key: string]: boolean }>({});
 
@@ -37,10 +38,17 @@ const PrototypeView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     ctx.imageSmoothingEnabled = false;
 
     // Lazy import of Engine to keep dev hot reload friendly
-    const { Engine } = require('../engine/engine');
+    try {
+      const { Engine } = require('../engine/engine');
 
-    if (!engineRef.current) {
-      engineRef.current = new Engine(CANVAS_WIDTH, CANVAS_HEIGHT, s => setStats(s), () => setGameOver(true));
+      if (!engineRef.current) {
+        engineRef.current = new Engine(CANVAS_WIDTH, CANVAS_HEIGHT, s => setStats(s), () => setGameOver(true));
+      }
+      setError(null);
+    } catch (e: any) {
+      console.error('Failed to initialize engine', e);
+      setError(String(e?.stack || e?.message || e));
+      return;
     }
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -60,13 +68,21 @@ const PrototypeView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     let animationFrameId = 0;
 
     const loop = () => {
-      engineRef.current!.step(keysRef.current);
-      engineRef.current!.draw(ctx, dpr, debug);
+      try {
+        engineRef.current!.step(keysRef.current);
+        engineRef.current!.draw(ctx, dpr, debug);
+      } catch (err: any) {
+        console.error('Runtime error in game loop', err);
+        setError(String(err?.stack || err?.message || err));
+        // stop playing on error
+        setIsPlaying(false);
+        return;
+      }
 
       animationFrameId = requestAnimationFrame(loop);
     };
 
-    if (isPlaying && !gameOver) {
+    if (isPlaying && !gameOver && !error) {
       loop();
     }
 
@@ -126,6 +142,17 @@ const PrototypeView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                     <span className="font-pixel text-sm">RESURRECT</span>
                 </button>
             </div>
+        )}
+
+        {error && (
+          <div className="absolute inset-0 z-40 p-6 flex flex-col items-center justify-center bg-black/90 text-sm text-white">
+            <h3 className="text-2xl font-bold text-red-400 mb-4">Runtime Error</h3>
+            <pre className="max-w-3xl max-h-60 overflow-auto whitespace-pre-wrap bg-zinc-900 p-4 rounded">{error}</pre>
+            <div className="mt-4 flex gap-3">
+              <button onClick={() => { setError(null); engineRef.current = null; }} className="px-4 py-2 bg-gray-800 rounded">Retry</button>
+              <button onClick={() => { navigator.clipboard?.writeText(error ?? ''); }} className="px-4 py-2 bg-gray-700 rounded">Copy</button>
+            </div>
+          </div>
         )}
 
         <canvas 
