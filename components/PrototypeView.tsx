@@ -37,19 +37,33 @@ const PrototypeView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     ctx.scale(dpr, dpr);
     ctx.imageSmoothingEnabled = false;
 
-    // Lazy import of Engine to keep dev hot reload friendly
-    try {
-      const { Engine } = require('../engine/engine');
+    // Dynamic import of Engine for ESM (require is not available in browser)
+    let cancelled = false;
+    let loopStarted = false;
 
-      if (!engineRef.current) {
-        engineRef.current = new Engine(CANVAS_WIDTH, CANVAS_HEIGHT, s => setStats(s), () => setGameOver(true));
+    const startLoopIfReady = () => {
+      if (loopStarted) return;
+      if (!engineRef.current) return;
+      loopStarted = true;
+      if (isPlaying && !gameOver && !error) {
+        animationFrameId = requestAnimationFrame(loop);
       }
-      setError(null);
-    } catch (e: any) {
-      console.error('Failed to initialize engine', e);
-      setError(String(e?.stack || e?.message || e));
-      return;
-    }
+    };
+
+    import('../engine/engine')
+      .then((mod) => {
+        if (cancelled) return;
+        const Engine = mod.Engine;
+        if (!engineRef.current) {
+          engineRef.current = new Engine(CANVAS_WIDTH, CANVAS_HEIGHT, (s: any) => setStats(s), () => setGameOver(true));
+        }
+        setError(null);
+        startLoopIfReady();
+      })
+      .catch((e: any) => {
+        console.error('Failed to initialize engine', e);
+        setError(String(e?.stack || e?.message || e));
+      });
 
     const urlParams = new URLSearchParams(window.location.search);
     const debug = urlParams.get('debug') === '1';
@@ -87,6 +101,7 @@ const PrototypeView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     }
 
     return () => {
+      cancelled = true;
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
