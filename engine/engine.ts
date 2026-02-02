@@ -23,6 +23,9 @@ export class Engine {
   width: number;
   height: number;
 
+  // Assets (images)
+  assets: { player?: HTMLImageElement | null; enemy?: HTMLImageElement | null } = {};
+
   // Impact/feedback state
   hitStopTimer = 0;
   flashTimer = 0;
@@ -58,7 +61,14 @@ export class Engine {
     this.particles = [];
     this.stats = { hp: 100, rage: 0, kills: 0 };
     this.gameOver = false;
+    this.hitStopTimer = 0;
+    this.flashTimer = 0;
+    this.shake = 0;
     this.notifyStats();
+  }
+
+  setAssets(assets: { player?: HTMLImageElement | null; enemy?: HTMLImageElement | null }) {
+    this.assets = assets;
   }
 
   notifyStats() {
@@ -143,6 +153,7 @@ export class Engine {
       }
 
       if (p.state === 'ATTACK' && p.attackTimer === 15) {
+        // compute attack box (could be overridden by sprite frame hitbox in future)
         const attackBox = {
           x: p.facing === 1 ? p.x + p.width : p.x - 80,
           y: p.y - 20,
@@ -164,6 +175,7 @@ export class Engine {
           this.notifyStats();
         }
       }
+    }
 
       // Player collision
       if (e.x < p.x + p.width && e.x + e.width > p.x && e.y < p.y + p.height && e.y + e.height > p.y) {
@@ -226,10 +238,14 @@ export class Engine {
     ctx.lineTo(this.width, GROUND_Y + 50);
     ctx.stroke();
 
-    // Enemies
+    // Enemies (draw sprites if available)
     for (const e of this.enemies) {
-      ctx.fillStyle = e.hurtTimer > 0 ? '#fff' : (e.type === 'Husk' ? '#444' : '#600');
-      ctx.fillRect(e.x, e.y - 10, e.width, e.height);
+      if (this.assets.enemy && this.assets.enemy.complete) {
+        ctx.drawImage(this.assets.enemy, e.x, e.y - 10, e.width, e.height);
+      } else {
+        ctx.fillStyle = e.hurtTimer > 0 ? '#fff' : (e.type === 'Husk' ? '#444' : '#600');
+        ctx.fillRect(e.x, e.y - 10, e.width, e.height);
+      }
       // HP bar
       ctx.fillStyle = '#222';
       ctx.fillRect(e.x, e.y - 25, e.width, 5);
@@ -237,24 +253,29 @@ export class Engine {
       ctx.fillRect(e.x, e.y - 25, e.width * (e.hp / 50), 5);
     }
 
-    // Player draw
+    // Player draw (sprite fallback)
     const p = this.player;
     ctx.save();
     ctx.translate(p.x + p.width / 2, p.y + p.height / 2);
     if (p.facing === -1) ctx.scale(-1, 1);
 
-    ctx.fillStyle = '#1e1e1e';
-    ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
-    ctx.fillStyle = '#300';
-    ctx.fillRect(-p.width / 2 - 5, -p.height / 2 + 5, p.width + 5, p.height - 5);
-
-    if (p.state === 'ATTACK') {
-      ctx.rotate((p.attackTimer / 25) * Math.PI - Math.PI / 2);
-      ctx.fillStyle = '#555';
-      ctx.fillRect(0, -100, 15, 120);
+    if (this.assets.player && this.assets.player.complete) {
+      // draw such that player origin aligns like rectangle fallback
+      ctx.drawImage(this.assets.player, -p.width / 2, -p.height / 2, p.width, p.height);
     } else {
-      ctx.fillStyle = '#555';
-      ctx.fillRect(5, -20, 10, 80);
+      ctx.fillStyle = '#1e1e1e';
+      ctx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+      ctx.fillStyle = '#300';
+      ctx.fillRect(-p.width / 2 - 5, -p.height / 2 + 5, p.width + 5, p.height - 5);
+
+      if (p.state === 'ATTACK') {
+        ctx.rotate((p.attackTimer / 25) * Math.PI - Math.PI / 2);
+        ctx.fillStyle = '#555';
+        ctx.fillRect(0, -100, 15, 120);
+      } else {
+        ctx.fillStyle = '#555';
+        ctx.fillRect(5, -20, 10, 80);
+      }
     }
 
     ctx.restore();

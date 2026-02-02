@@ -58,7 +58,18 @@ const PrototypeView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
           engineRef.current = new Engine(CANVAS_WIDTH, CANVAS_HEIGHT, (s: any) => setStats(s), () => setGameOver(true));
         }
         setError(null);
-        startLoopIfReady();
+
+        // Load assets and attach to engine
+        import('../src/assets/loader')
+          .then(m => m.loadAssets())
+          .then(assets => {
+            engineRef.current?.setAssets(assets);
+            startLoopIfReady();
+          })
+          .catch((ae: any) => {
+            console.warn('Asset load failed, using placeholders', ae);
+            startLoopIfReady();
+          });
       })
       .catch((e: any) => {
         console.error('Failed to initialize engine', e);
